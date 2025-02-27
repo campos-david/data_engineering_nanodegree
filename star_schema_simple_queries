@@ -1,0 +1,89 @@
+# Doing simple queries to extract data from some tables that are on the star schema arrangement
+# Using SQL inside python-s notebook, library psycopg2
+
+import psycopg2
+
+# Connect to a Udacity database
+
+conn = psycopg2.connect("host=127.0.0.1 dbname=studentdb user=student password=student")
+
+# Get a cursor to execute queries in SQL inside Python (psycopg2 library, right?)
+
+cur = conn.cursor()
+
+# Autocommit set true
+
+conn.set_session(autocommit=True)
+
+# As we are working with an empty database, we-ll need to create the fact and dimensions tables. It-s a long script so feel free to skip it
+
+# First the fact table
+
+cur.execute("CREATE TABLE IF NOT EXISTS customer_transactions (customer_id int, store_id int, spent numeric);")
+cur.execute("""INSERT INTO customer_transactions (customer_id, store_id, spent)
+                VALUES (%s, %s, %s)""",
+               (1, 1, 20.50))
+cur.execute("""INSERT INTO customer_transactions (customer_id, store_id, spent)
+                VALUES (%s, %s, %s)""",
+               (2, 1, 35.21))
+               
+# Then the dimensions tables
+
+cur.execute("CREATE TABLE IF NOT EXISTS items_purchased (customer_id int, item_number int, item_name varchar);")
+cur.execute("""INSERT INTO items_purchased (customer_id, item_number, item_name)
+                VALUES (%s, %s, %s)""",
+               (1, 1, 'Rubber Soul'))
+cur.execute("""INSERT INTO items_purchased (customer_id, item_number, item_name)
+                VALUES (%s, %s, %s)""",
+               (2, 3, 'Let It Be'))
+
+cur.execute("CREATE TABLE IF NOT EXISTS customer (customer_id int, name varchar, rewards Boolean);")
+cur.execute("""INSERT INTO customer (customer_id, name, rewards)
+                VALUES (%s, %s, %s)""",
+               (1, 'Amanda', True))
+cur.execute("""INSERT INTO customer (customer_id, name, rewards)
+                VALUES (%s, %s, %s)""",
+               (2, 'Toby', False))
+
+cur.execute("CREATE TABLE IF NOT EXISTS store (store_id int, state varchar);")
+cur.execute("""INSERT INTO store (store_id, state)
+                VALUES (%s, %s)""",
+               (1, 'CA'))
+cur.execute("""INSERT INTO store (store_id, state)
+                VALUES (%s, %s)""",
+               (2, 'WA'))
+
+# Now, answering some business questions
+# Query #1: Find all the customers that spent more than 30 dollars, who are they, which store they bought it from, location of the store, what they bought and if they are a rewards member.
+
+cur.execute("""SELECT c.name, s.store_id, s.state, ip.item_name, c.rewards FROM (((customer_transactions ct
+JOIN customer c ON ct.customer_id=c.customer_id)
+JOIN store s ON ct.store_id=s.store_id)
+JOIN items_purchased ip ON ct.customer_id=ip.customer_id)
+WHERE spent > 30;
+""")
+
+row = cur.fetchone()
+print(row)
+
+# Query #2: How much did Customer 2 spend?
+
+cur.execute("""SELECT customer_id, SUM(spent) FROM customer_transactions
+WHERE customer_id = 2
+GROUP BY customer_id;
+""")
+
+row = cur.fetchone()
+print(row)
+
+# Then, dropping the tables from the database
+
+cur.execute("DROP table customer_transactions")
+cur.execute("DROP table items_purchased")
+cur.execute("DROP table customer")
+cur.execute("DROP table store")
+
+# And finally closing the cursor and the connection
+
+cur.close()
+conn.close()
